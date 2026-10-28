@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#173b2c">
+<title>Meu Controle de Gastos</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#17231c;background:#f3f6f3}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:680px;margin:0 auto;padding:22px 16px 40px}
+header{padding:22px 20px;background:#173b2c;color:white;border-radius:18px;margin-bottom:18px}
+h1{font-size:1.45rem;margin:0 0 6px}header p{margin:0;color:#dce9df}
+.card{background:white;border:1px solid #dce5de;border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 4px 16px #163a2b0b}
+label{display:block;font-weight:650;margin:13px 0 6px}
+input,select,button{font:inherit;width:100%;border-radius:10px;padding:12px;border:1px solid #bdcbc0}
+input:focus,select:focus{outline:2px solid #6b9f7b;border-color:transparent}
+button{border:0;background:#17653e;color:white;font-weight:700;cursor:pointer;margin-top:14px}
+button:disabled{opacity:.55;cursor:wait}.secondary{background:#e9f0eb;color:#173b2c}
+.small{font-size:.9rem;color:#53645a;line-height:1.45}.status{padding:12px;border-radius:10px;margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ok{background:#e4f6e9;color:#185b31}.err{background:#fff0ec;color:#8b2e19}.info{background:#edf3ff;color:#214c7d}
+.hidden{display:none}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.row{grid-template-columns:1fr}}
+footer{font-size:.82rem;color:#66746a;text-align:center;padding:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>Meu Controle de Gastos</h1>
+<p>Registre uma compra usando a chave da NFC-e.</p>
+</header>
+<section class="card">
+<h2>1. Consultar nota fiscal</h2>
+<p class="small">Digite os 44 números da chave de acesso impressa no cupom. O sistema tentará consultar a SEFAZ-ES e importar os dados disponíveis.</p>
+<label for="chave">Chave de acesso (44 dígitos)</label>
+<input id="chave" inputmode="numeric" autocomplete="off" maxlength="60" placeholder="Cole ou digite a chave de acesso">
+<label for="senha">Senha do aplicativo</label>
+<input id="senha" type="password" autocomplete="current-password" placeholder="Senha configurada no Apps Script">
+<button id="consultar" type="button">Consultar e importar</button>
+<div id="status" class="status hidden" role="status"></div>
+</section>
+<section id="manual" class="card hidden">
+<h2>2. Completar lançamento manualmente</h2>
+<p class="small">A consulta automática não trouxe todos os campos. Você pode salvar os dados que conseguir confirmar no cupom. Não preencha valores estimados.</p>
+<label for="loja">Loja / estabelecimento</label><input id="loja" placeholder="Nome da loja">
+<div class="row">
+<div><label for="data">Data da compra</label><input id="data" type="date"></div>
+<div><label for="total">Total (R$)</label><input id="total" inputmode="decimal" placeholder="0,00"></div>
+</div>
+<label for="categoria">Categoria</label>
+<select id="categoria">
+<option>Mercado</option><option>Alimentação</option><option>Transporte</option><option>Saúde</option><option>Casa</option><option>Vestuário</option><option>Lazer</option><option>Outros</option>
+</select>
+<label for="itens">Produtos (um por linha, opcional)</label>
+<textarea id="itens" rows="4" style="width:100%;font:inherit;padding:12px;border:1px solid #bdcbc0;border-radius:10px" placeholder="Arroz - 22,90&#10;Leite - 5,49"></textarea>
+<button id="salvar" type="button">Salvar lançamento</button>
+<div id="manualStatus" class="status hidden" role="status"></div>
+</section>
+<footer>Os dados só serão gravados após uma resposta de sucesso do Apps Script.</footer>
+</div>
+<script>
+const URL_DO_MOTOR = "COLE_AQUI_A_URL_DO_APPS_SCRIPT";
+const $ = id => document.getElementById(id);
+let chaveAtual = "";
+
+function mostrar(id, mensagem, tipo) {
+  const el = $(id);
+  el.textContent = mensagem;
+  el.className = "status " + tipo;
+}
+function limparChave(valor) { return String(valor || "").replace(/\D/g, ""); }
+
+async function enviar(payload) {
+  if (!URL_DO_MOTOR.startsWith("https://script.google.com/")) {
+    throw new Error("Configure URL_DO_MOTOR no index.html com a URL /exec do seu Apps Script.");
+  }
+  const resposta = await fetch(URL_DO_MOTOR, {
+    method: "POST",
+    headers: {"Content-Type": "text/plain;charset=utf-8"},
+    body: JSON.stringify(payload)
+  });
+  const texto = await resposta.text();
+  let dados;
+  try { dados = JSON.parse(texto); }
+  catch (_) { throw new Error("O Apps Script retornou uma resposta inesperada. Confira a implantação e as permissões."); }
+  if (!resposta.ok || !dados.ok) throw new Error(dados.erro || "Não foi possível concluir a operação.");
+  return dados;
+}
+
+$("consultar").addEventListener("click", async () => {
+  const chave = limparChave($("chave").value);
+  const senha = $("senha").value.trim();
+  if (chave.length !== 44) {
+    mostrar("status", "A chave precisa ter exatamente 44 dígitos. Confira os números no cupom.", "err");
+    return;
+  }
+  if (!senha) {
+    mostrar("status", "Digite a senha do aplicativo.", "err");
+    return;
+  }
+  chaveAtual = chave;
+  $("consultar").disabled = true;
+  $("consultar").textContent = "Consultando...";
+  $("manual").classList.add("hidden");
+  mostrar("status", "Tentando consultar a NFC-e na SEFAZ-ES...", "info");
+  try {
+    const dados = await enviar({acao:"consultarChave", chave, senha});
+    if (dados.importado) {
+      mostrar("status", dados.mensagem || "Nota importada com sucesso.", "ok");
+      $("manual").classList.add("hidden");
+    } else {
+      mostrar("status", dados.mensagem || "A SEFAZ não disponibilizou todos os dados automaticamente.", "info");
+      $("manual").classList.remove("hidden");
+      if (dados.nota) {
+        $("loja").value = dados.nota.loja || "";
+        $("data").value = dados.nota.dataISO || "";
+        $("total").value = dados.nota.total != null ? String(dados.nota.total).replace(".", ",") : "";
+        $("itens").value = (dados.nota.itens || []).join("\n");
+      }
+    }
+  } catch (e) {
+    mostrar("status", e.message || "Erro na consulta.", "err");
+    // Mantém a possibilidade de registro manual sem afirmar que houve consulta.
+    $("manual").classList.remove("hidden");
+  } finally {
+    $("consultar").disabled = false;
+    $("consultar").textContent = "Consultar e importar";
+  }
+});
+
+$("salvar").addEventListener("click", async () => {
+  const senha = $("senha").value.trim();
+  const loja = $("loja").value.trim();
+  const data = $("data").value;
+  const totalTexto = $("total").value.trim().replace(/\s/g,"").replace(/\.(?=\d{3}(?:,|$))/g,"").replace(",",".");
+  const total = Number(totalTexto);
+  if (!chaveAtual || chaveAtual.length !== 44) return mostrar("manualStatus", "Consulte ou informe uma chave válida primeiro.", "err");
+  if (!senha) return mostrar("manualStatus", "Digite a senha do aplicativo.", "err");
+  if (!loja || !data || !Number.isFinite(total) || total <= 0) return mostrar("manualStatus", "Preencha loja, data e total com os dados do cupom.", "err");
+  const itens = $("itens").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  $("salvar").disabled = true;
+  try {
+    const dados = await enviar({acao:"salvarManual", senha, chave:chaveAtual, loja, data, total, categoria:$("categoria").value, itens});
+    mostrar("manualStatus", dados.mensagem || "Lançamento salvo.", "ok");
+  } catch(e) {
+    mostrar("manualStatus", e.message || "Não foi possível salvar.", "err");
+  } finally { $("salvar").disabled = false; }
+});
+</script>
+</body>
+</html>
