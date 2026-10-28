@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#166534">
+  <meta name="description" content="Controle de gastos a partir de cupons fiscais NFC-e.">
+  <title>Minhas Notinhas</title>
+
+  <!-- Biblioteca gratuita de leitura de QR Code, versão fixa 2.3.8 -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --green: #166534;
+      --green-dark: #14532d;
+      --green-soft: #dcfce7;
+      --ink: #17211b;
+      --muted: #5c6b61;
+      --line: #d8e2da;
+      --surface: #ffffff;
+      --background: #f3f7f4;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --info: #174ea6;
+      --info-soft: #eff6ff;
+      --radius: 18px;
+      --shadow: 0 4px 18px rgba(20, 50, 30, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    button, input, select { font: inherit; }
+
+    button {
+      min-height: 54px;
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 18px;
+      font-weight: 750;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    button:disabled {
+      opacity: .58;
+      cursor: not-allowed;
+    }
+
+    .app-header {
+      padding: calc(20px + env(safe-area-inset-top)) 18px 22px;
+      background: var(--green);
+      color: white;
+    }
+
+    .header-inner, main {
+      width: min(100%, 720px);
+      margin: 0 auto;
+    }
+
+    .brand {
+      margin: 0;
+      font-size: clamp(1.6rem, 7vw, 2rem);
+      line-height: 1.15;
+      letter-spacing: -.03em;
+    }
+
+    .tagline {
+      margin: 8px 0 0;
+      color: #e7f8eb;
+      font-size: 1rem;
+    }
+
+    .header-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    .small-button {
+      min-height: 38px;
+      padding: 6px 12px;
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 10px;
+      color: white;
+      background: transparent;
+      font-size: .86rem;
+      font-weight: 650;
+    }
+
+    main {
+      padding: 18px 14px calc(30px + env(safe-area-inset-bottom));
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      letter-spacing: -.015em;
+    }
+
+    .help {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: .94rem;
+    }
+
+    .primary-button {
+      display: block;
+      width: 100%;
+      min-height: 66px;
+      color: white;
+      background: var(--green);
+      font-size: 1.2rem;
+      box-shadow: 0 4px 0 var(--green-dark);
+    }
+
+    .primary-button:active { transform: translateY(2px); box-shadow: none; }
+
+    .secondary-button {
+      color: var(--green-dark);
+      background: var(--green-soft);
+      border: 1px solid #b7e4c7;
+    }
+
+    .field-label {
+      display: block;
+      margin: 12px 0 7px;
+      font-weight: 700;
+      font-size: .98rem;
+    }
+
+    input, select {
+      display: block;
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid #aebdb2;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: white;
+      color: var(--ink);
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus, button:focus-visible {
+      outline: 3px solid #86efac;
+      outline-offset: 2px;
+    }
+
+    .inline-form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .inline-form button { width: 100%; }
+
+    .reader-wrap {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 16px;
+      background: #101712;
+      overflow: hidden;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+      min-height: 0;
+      color: white;
+    }
+
+    #reader video {
+      width: 100% !important;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    #reader__scan_region {
+      min-height: 0 !important;
+    }
+
+    #reader__dashboard, #reader__status_span {
+      color: white !important;
+    }
+
+    .reader-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .reader-actions button { flex: 1; }
+
+    .hidden { display: none !important; }
+
+    .status {
+      padding: 13px 14px;
+      border-radius: 12px;
+      margin: 0 0 16px;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .status.info { background: var(--info-soft); color: var(--info); }
+    .status.success { background: var(--green-soft); color: var(--green-dark); }
+    .status.error { background: var(--danger-soft); color: var(--danger); }
+    .status.warning { background: #fff7e6; color: #7a4b00; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .summary-cell {
+      min-width: 0;
+      padding: 12px;
+      border-radius: 12px;
+      background: #f5f8f5;
+    }
+
+    .summary-cell.full { grid-column: 1 / -1; }
+
+    .summary-label {
+      display: block;
+      color: var(--muted);
+      font-size: .83rem;
+      font-weight: 650;
+    }
+
+    .summary-value {
+      display: block;
+      margin-top: 3px;
+      font-size: 1.04rem;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+    }
+
+    .total-value {
+      color: var(--green-dark);
+      font-size: 1.5rem;
+    }
+
+    .items-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .item-row {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .item-row:last-child { border-bottom: 0; }
+
+    .item-name {
+      display: block;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+    }
+
+    .item-detail {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .item-total {
+      color: var(--ink);
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .category-row { margin-top: 16px; }
+
+    .footnote {
+      color: var(--muted);
+      font-size: .82rem;
+      text-align: center;
+      padding: 4px 10px 16px;
+    }
+
+    dialog {
+      width: min(calc(100% - 28px), 440px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.25);
+    }
+
+    dialog::backdrop { background: rgba(15, 25, 18, .58); }
+
+    dialog h2 { margin-top: 0; }
+
+    .dialog-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .muted-button {
+      background: #edf1ed;
+      color: var(--ink);
+    }
+
+    @media (min-width: 560px) {
+      main { padding-top: 24px; }
+      .card { padding: 22px; }
+      .inline-form { grid-template-columns: 1fr auto; align-items: end; }
+      .inline-form button { min-width: 130px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <h1 class="brand">Minhas Notinhas</h1>
+      <p class="tagline">Seu controle de gastos, direto do cupom fiscal.</p>
+      <div class="header-actions">
+        <button id="trocarSenhaBtn" class="small-button" type="button">Trocar senha</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="status" class="status info" role="status" aria-live="polite">
+      Informe sua senha para começar.
+    </div>
+
+    <section class="card" aria-labelledby="lerTitulo">
+      <h2 id="lerTitulo">Lançar uma compra</h2>
+      <p class="help">Aponte a câmera para o QR Code do cupom fiscal ou cole o link completo da nota.</p>
+
+      <button id="lerBtn" class="primary-button" type="button">📷 Ler notinha</button>
+
+      <div id="cameraPanel" class="hidden">
+        <div class="reader-wrap">
+          <div id="reader" aria-label="Leitor de QR Code"></div>
+        </div>
+        <div class="reader-actions">
+          <button id="pararCameraBtn" class="secondary-button" type="button">Parar câmera</button>
+        </div>
+        <p class="help" style="margin-top:10px;margin-bottom:0">Mantenha o QR Code inteiro dentro do quadrado. Se solicitado, permita o acesso à câmera.</p>
+      </div>
+
+      <label class="field-label" for="linkNota">Ou cole o link da nota</label>
+      <div class="inline-form">
+        <input id="linkNota" type="url" inputmode="url" autocomplete="url"
+          placeholder="https://app.sefaz.es.gov.br/..." aria-describedby="linkAjuda">
+        <button id="lancarBtn" class="secondary-button" type="button">Lançar</button>
+      </div>
+      <p id="linkAjuda" class="help" style="margin-top:8px;margin-bottom:0">Cole o endereço completo que veio no QR Code, incluindo a chave de acesso.</p>
+    </section>
+
+    <section id="resultado" class="card hidden" aria-labelledby="resultadoTitulo">
+      <h2 id="resultadoTitulo">Resumo da compra</h2>
+      <div class="summary-grid">
+        <div class="summary-cell full">
+          <span class="summary-label">Loja</span>
+          <span id="lojaValor" class="summary-value">—</span>
+        </div>
+        <div class="summary-cell">
+          <span class="summary-label">Data</span>
+          <span id="dataValor" class="summary-value">—</span>
+        </div>
+        <div class="summary-cell">
+          <span class="summary-label">Total</span>
+          <span id="totalValor" class="summary-value total-value">—</span>
+        </div>
+        <div class="summary-cell full">
+          <span class="summary-label">Forma de pagamento</span>
+          <span id="pagamentoValor" class="summary-value">—</span>
+        </div>
+      </div>
+
+      <div class="category-row">
+        <label class="field-label" for="categoria">Categoria da loja</label>
+        <select id="categoria">
+          <option value="Mercado">Mercado</option>
+          <option value="Farmácia">Farmácia</option>
+          <option value="Combustível">Combustível</option>
+          <option value="Restaurante">Restaurante</option>
+          <option value="Outros">Outros</option>
+        </select>
+        <button id="salvarCategoriaBtn" class="secondary-button" type="button" style="width:100%;margin-top:10px">Salvar categoria</button>
+      </div>
+
+      <h2 style="margin-top:24px">Itens da notinha</h2>
+      <ul id="itensLista" class="items-list"></ul>
+    </section>
+
+    <p class="footnote">A senha fica guardada neste navegador. Use apenas em um aparelho confiável.</p>
+  </main>
+
+  <dialog id="senhaDialog" aria-labelledby="senhaTitulo">
+    <form id="senhaForm">
+      <h2 id="senhaTitulo">Senha do aplicativo</h2>
+      <p id="senhaDescricao" class="help">Digite a senha configurada no Apps Script.</p>
+      <label class="field-label" for="senhaInput">Senha</label>
+      <input id="senhaInput" type="password" autocomplete="current-password"
+        required placeholder="Digite sua senha">
+      <div class="dialog-actions">
+        <button id="cancelarSenhaBtn" class="muted-button" type="button">Cancelar</button>
+        <button class="primary-button" type="submit" style="font-size:1rem;min-height:54px;box-shadow:none">Salvar senha</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // Cole aqui a URL do aplicativo da Web implantado no Google Apps Script.
+    const URL_DO_MOTOR = "COLE_AQUI_A_URL_DO_APPS_SCRIPT";
+
+    const CHAVE_SENHA_LOCAL = "minhasNotinhasSenha";
+    const CATEGORIAS = ["Mercado", "Farmácia", "Combustível", "Restaurante", "Outros"];
+
+    const el = (id) => document.getElementById(id);
+    let senha = "";
+    let leitorQr = null;
+    let cameraAtiva = false;
+    let compraAtual = null;
+    let enviando = false;
+
+    function mostrarStatus(mensagem, tipo = "info") {
+      const caixa = el("status");
+      caixa.textContent = mensagem;
+      caixa.className = "status " + tipo;
+      caixa.classList.remove("hidden");
+    }
+
+    function formatarMoeda(valor) {
+      const numero = Number(valor);
+      if (!Number.isFinite(numero)) return "—";
+      return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    function textoSeguro(valor, alternativa = "—") {
+      if (valor === null || valor === undefined || String(valor).trim() === "") {
+        return alternativa;
+      }
+      return String(valor);
+    }
+
+    function obterSenha() {
+      try {
+        return localStorage.getItem(CHAVE_SENHA_LOCAL) || "";
+      } catch (erro) {
+        return "";
+      }
+    }
+
+    function abrirDialogSenha(trocar = false) {
+      el("senhaInput").value = "";
+      el("senhaDescricao").textContent = trocar
+        ? "Digite a nova senha configurada no Apps Script."
+        : "Digite a senha configurada no Apps Script. Ela será guardada neste navegador.";
+      el("cancelarSenhaBtn").classList.toggle("hidden", !senha && !trocar);
+      if (typeof el("senhaDialog").showModal === "function") {
+        el("senhaDialog").showModal();
+      } else {
+        const novaSenha = window.prompt("Digite a senha configurada no Apps Script:");
+        if (novaSenha) guardarSenha(novaSenha);
+      }
+      window.setTimeout(() => el("senhaInput").focus(), 50);
+    }
+
+    function guardarSenha(valor) {
+      const limpa = String(valor || "").trim();
+      if (!limpa) {
+        mostrarStatus("Digite uma senha antes de continuar.", "warning");
+        return false;
+      }
+      try {
+        localStorage.setItem(CHAVE_SENHA_LOCAL, limpa);
+      } catch (erro) {
+        mostrarStatus("Não foi possível guardar a senha neste navegador. Verifique as configurações de privacidade.", "error");
+        return false;
+      }
+      senha = limpa;
+      mostrarStatus("Senha guardada neste aparelho. Você já pode lançar uma notinha.", "success");
+      return true;
+    }
+
+    el("senhaForm").addEventListener("submit", (evento) => {
+      evento.preventDefault();
+      if (guardarSenha(el("senhaInput").value)) {
+        el("senhaDialog").close();
+      }
+    });
+
+    el("cancelarSenhaBtn").addEventListener("click", () => el("senhaDialog").close());
+
+    el("trocarSenhaBtn").addEventListener("click", () => abrirDialogSenha(true));
+
+    async function enviarAoMotor(payload) {
+      if (!URL_DO_MOTOR || URL_DO_MOTOR.includes("COLE_AQUI")) {
+        throw new Error("Configure a constante URL_DO_MOTOR no arquivo index.html antes de usar o aplicativo.");
+      }
+      if (!senha) {
+        abrirDialogSenha();
+        throw new Error("Informe a senha do aplicativo para continuar.");
+      }
+
+      const corpo = { ...payload, senha };
+
+      let resposta;
+      try {
+        resposta = await fetch(URL_DO_MOTOR, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(corpo),
+          redirect: "follow"
+        });
+      } catch (erro) {
+        throw new Error("Não consegui conectar ao motor. Confira a URL, a conexão e se o Apps Script está implantado como aplicativo da Web.");
+      }
+
+      if (!resposta.ok) {
+        throw new Error("O motor respondeu com erro HTTP " + resposta.status + ".");
+      }
+
+      let dados;
+      try {
+        dados = await resposta.json();
+      } catch (erro) {
+        throw new Error("O motor respondeu em um formato inesperado. Verifique a implantação do Apps Script.");
+      }
+
+      if (dados && dados.aviso === "Senha inválida") {
+        throw new Error("Senha inválida. Use “Trocar senha” para corrigir.");
+      }
+
+      return dados;
+    }
+
+    function validarLink(link) {
+      let url;
+      try {
+        url = new URL(link);
+      } catch (erro) {
+        throw new Error("Cole um link válido da nota fiscal.");
+      }
+      if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "app.sefaz.es.gov.br") {
+        throw new Error("O link deve ser da página oficial da SEFAZ do Espírito Santo.");
+      }
+      return url.href;
+    }
+
+    async function lancarLink(link) {
+      if (enviando) return;
+      let linkValidado;
+      try {
+        linkValidado = validarLink(String(link || "").trim());
+      } catch (erro) {
+        mostrarStatus(erro.message, "error");
+        return;
+      }
+
+      enviando = true;
+      el("lancarBtn").disabled = true;
+      el("lerBtn").disabled = true;
+      mostrarStatus("Buscando a nota...", "info");
+      el("resultado").classList.add("hidden");
+
+      try {
+        const dados = await enviarAoMotor({
+          acao: "lancar",
+          link: linkValidado,
+          loja: "",
+          categoria: ""
+        });
+
+        if (!dados || dados.ok !== true) {
+          throw new Error(textoSeguro(dados && dados.aviso, "Não foi possível lançar a nota."));
+        }
+
+        if (dados.aviso === "Essa notinha já foi lançada") {
+          mostrarStatus(dados.aviso, "warning");
+          // Se o motor só informar duplicidade, não há resumo completo para exibir.
+          return;
+        }
+
+        if (!Array.isArray(dados.itens)) {
+          throw new Error("A resposta não trouxe a lista de itens esperada. A nota não pode ser exibida corretamente.");
+        }
+
+        compraAtual = {
+          loja: textoSeguro(dados.loja, ""),
+          categoria: CATEGORIAS.includes(dados.categoria) ? dados.categoria : "Outros"
+        };
+        mostrarCompra(dados);
+        mostrarStatus(textoSeguro(dados.aviso, "Compra lançada com sucesso."), "success");
+        el("resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (erro) {
+        mostrarStatus(erro.message || "Ocorreu um erro ao lançar a nota.", "error");
+      } finally {
+        enviando = false;
+        el("lancarBtn").disabled = false;
+        el("lerBtn").disabled = false;
+      }
+    }
+
+    function mostrarCompra(dados) {
+      el("lojaValor").textContent = textoSeguro(dados.loja);
+      el("dataValor").textContent = textoSeguro(dados.data);
+      el("totalValor").textContent = formatarMoeda(dados.total);
+      el("pagamentoValor").textContent = textoSeguro(dados.pagamento || dados.formaPagamento);
+
+      const categoria = CATEGORIAS.includes(dados.categoria) ? dados.categoria : "Outros";
+      el("categoria").value = categoria;
+
+      const lista = el("itensLista");
+      lista.replaceChildren();
+
+      if (!dados.itens.length) {
+        const li = document.createElement("li");
+        li.className = "item-row";
+        li.textContent = "Nenhum item foi retornado pelo motor.";
+        lista.appendChild(li);
+      } else {
+        dados.itens.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "item-row";
+
+          const nome = document.createElement("span");
+          nome.className = "item-name";
+          nome.textContent = textoSeguro(item.descricao);
+
+          const detalhe = document.createElement("div");
+          detalhe.className = "item-detail";
+
+          const qtd = document.createElement("span");
+          const quantidade = textoSeguro(item.quantidade, "—");
+          const unidade = textoSeguro(item.unidade, "");
+          qtd.textContent = unidade && unidade !== "—"
+            ? quantidade + " " + unidade
+            : quantidade;
+
+          const total = document.createElement("span");
+          total.className = "item-total";
+          total.textContent = formatarMoeda(item.total);
+
+          detalhe.append(qtd, total);
+          li.append(nome, detalhe);
+
+          if (item.precoUnitario !== null && item.precoUnitario !== undefined) {
+            const unitario = document.createElement("div");
+            unitario.className = "item-detail";
+            unitario.textContent = "Preço unitário: " + formatarMoeda(item.precoUnitario);
+            li.appendChild(unitario);
+          }
+
+          lista.appendChild(li);
+        });
+      }
+
+      el("resultado").classList.remove("hidden");
+    }
+
+    el("lancarBtn").addEventListener("click", () => lancarLink(el("linkNota").value));
+
+    el("linkNota").addEventListener("keydown", (evento) => {
+      if (evento.key === "Enter") {
+        evento.preventDefault();
+        lancarLink(el("linkNota").value);
+      }
+    });
+
+    async function iniciarCamera() {
+      if (cameraAtiva) return;
+
+      if (!window.isSecureContext) {
+        mostrarStatus("A câmera exige uma página HTTPS. Publique o arquivo no GitHub Pages e abra o endereço https://.", "error");
+        return;
+      }
+
+      if (typeof Html5Qrcode === "undefined") {
+        mostrarStatus("A biblioteca de leitura não carregou. Verifique a conexão com a internet e recarregue a página.", "error");
+        return;
+      }
+
+      el("cameraPanel").classList.remove("hidden");
+      el("lerBtn").disabled = true;
+      mostrarStatus("Abrindo a câmera traseira...", "info");
+
+      try {
+        leitorQr = new Html5Qrcode("reader", { verbose: false });
+        cameraAtiva = true;
+
+        await leitorQr.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: (largura, altura) => {
+              const lado = Math.floor(Math.min(largura, altura) * 0.72);
+              return { width: lado, height: lado };
+            },
+            aspectRatio: 1.0,
+            disableFlip: false
+          },
+          async (textoLido) => {
+            if (!cameraAtiva) return;
+            el("linkNota").value = textoLido;
+            await pararCamera();
+            mostrarStatus("QR Code lido. Enviando a notinha para consulta...", "info");
+            await lancarLink(textoLido);
+          },
+          () => {
+            // Falhas de leitura por quadro são normais; não exibir alerta a cada quadro.
+          }
+        );
+
+        mostrarStatus("Câmera ligada. Aponte para o QR Code do cupom.", "info");
+      } catch (erro) {
+        cameraAtiva = false;
+        el("cameraPanel").classList.add("hidden");
+        el("lerBtn").disabled = false;
+        leitorQr = null;
+        const detalhe = String(erro && erro.message ? erro.message : erro);
+        if (/permission|denied|notallowed/i.test(detalhe)) {
+          mostrarStatus("A câmera foi bloqueada. Permita o acesso à câmera nas configurações do navegador e tente novamente.", "error");
+        } else if (/notfound|device/i.test(detalhe)) {
+          mostrarStatus("Não encontrei uma câmera disponível neste aparelho.", "error");
+        } else {
+          mostrarStatus("Não consegui abrir a câmera. Verifique a permissão e tente novamente. " + detalhe, "error");
+        }
+      }
+    }
+
+    async function pararCamera() {
+      if (leitorQr) {
+        try {
+          if (cameraAtiva) await leitorQr.stop();
+        } catch (erro) {
+          // A câmera pode já estar desligada.
+        }
+        try {
+          await leitorQr.clear();
+        } catch (erro) {
+          // A área pode já estar limpa.
+        }
+      }
+      leitorQr = null;
+      cameraAtiva = false;
+      el("cameraPanel").classList.add("hidden");
+      el("lerBtn").disabled = false;
+    }
+
+    el("lerBtn").addEventListener("click", iniciarCamera);
+    el("pararCameraBtn").addEventListener("click", async () => {
+      await pararCamera();
+      mostrarStatus("Câmera desligada.", "info");
+    });
+
+    el("salvarCategoriaBtn").addEventListener("click", async () => {
+      if (!compraAtual || !compraAtual.loja) {
+        mostrarStatus("Lance uma notinha antes de alterar a categoria.", "warning");
+        return;
+      }
+
+      const categoria = el("categoria").value;
+      if (!CATEGORIAS.includes(categoria)) {
+        mostrarStatus("Escolha uma categoria da lista.", "error");
+        return;
+      }
+
+      el("salvarCategoriaBtn").disabled = true;
+      mostrarStatus("Salvando categoria...", "info");
+
+      try {
+        const dados = await enviarAoMotor({
+          acao: "categoria",
+          loja: compraAtual.loja,
+          categoria: categoria,
+          link: ""
+        });
+
+        if (!dados || dados.ok !== true) {
+          throw new Error(textoSeguro(dados && dados.aviso, "Não foi possível salvar a categoria."));
+        }
+
+        compraAtual.categoria = categoria;
+        mostrarStatus(textoSeguro(dados.aviso, "Categoria salva."), "success");
+      } catch (erro) {
+        mostrarStatus(erro.message || "Erro ao salvar a categoria.", "error");
+      } finally {
+        el("salvarCategoriaBtn").disabled = false;
+      }
+    });
+
+    // Inicialização: solicita senha na primeira visita deste navegador.
+    senha = obterSenha();
+    if (!senha) {
+      abrirDialogSenha();
+      mostrarStatus("Para começar, informe a senha configurada no Apps Script.", "info");
+    } else {
+      mostrarStatus("Pronto para ler ou lançar uma notinha.", "success");
+    }
+
+    window.addEventListener("pagehide", () => {
+      if (leitorQr && cameraAtiva) {
+        leitorQr.stop().catch(() => {});
+      }
+    });
+  </script>
+</body>
+</html>
